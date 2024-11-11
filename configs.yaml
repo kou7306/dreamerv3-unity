@@ -182,3 +182,18 @@ debug:
   prefill: 1
   batch_size: 10
   batch_length: 20
+
+unity:
+  steps: 4e5
+  envs: 1
+  action_repeat: 4
+  train_ratio: 1024
+  video_pred_log: true
+  eval_episode_num: 100
+  imag_gradient: 'reinforce'
+  noops: 30
+  resize: opencv
+  actions: needed
+  time_limit: 108000
+  # unity_file: "vtc_unity"
+  task: "unity_robot"

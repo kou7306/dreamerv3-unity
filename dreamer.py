@@ -145,6 +145,7 @@ def make_dataset(episodes, config):
 
 def make_env(config, mode, id):
     suite, task = config.task.split("_", 1)
+    print("suite", suite)
     if suite == "dmc":
         import envs.dmc as dmc
 
@@ -193,6 +194,16 @@ def make_env(config, mode, id):
 
         env = minecraft.make_env(task, size=config.size, break_speed=config.break_speed)
         env = wrappers.OneHotAction(env)
+    elif suite == "unity":
+        print("UnityEnv")
+        from envs.unity import UnityEnv  # UnityEnvクラスのインポート
+
+        env = UnityEnv(
+            action_repeat=config.action_repeat,
+            size=config.size,
+            noops=config.noops,
+            seed=config.seed + id
+        )
     else:
         raise NotImplementedError(suite)
     env = wrappers.TimeLimit(env, config.time_limit)
@@ -208,6 +219,7 @@ def main(config):
     if config.deterministic_run:
         tools.enable_deterministic_run()
     logdir = pathlib.Path(config.logdir).expanduser()
+
     config.traindir = config.traindir or logdir / "train_eps"
     config.evaldir = config.evaldir or logdir / "eval_eps"
     config.steps //= config.action_repeat
@@ -234,6 +246,7 @@ def main(config):
     else:
         directory = config.evaldir
     eval_eps = tools.load_episodes(directory, limit=1)
+    print("config" ,config)
     make = lambda mode, id: make_env(config, mode, id)
     train_envs = [make("train", i) for i in range(config.envs)]
     eval_envs = [make("eval", i) for i in range(config.envs)]
@@ -300,6 +313,7 @@ def main(config):
 
     # make sure eval will be executed once after config.steps
     while agent._step < config.steps + config.eval_every:
+        print("Start episode.")
         logger.write()
         if config.eval_episode_num > 0:
             print("Start evaluation.")
@@ -331,6 +345,7 @@ def main(config):
             "agent_state_dict": agent.state_dict(),
             "optims_state_dict": tools.recursively_collect_optim_state_dict(agent),
         }
+        print("save model")
         torch.save(items_to_save, logdir / "latest.pt")
     for env in train_envs + eval_envs:
         try:
