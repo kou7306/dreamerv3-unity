@@ -176,7 +176,9 @@ def simulate(
             action = np.array(action)
         assert len(action) == len(envs)
         # step envs
+        print(action)
         results = [e.step(a) for e, a in zip(envs, action)]
+        print(results)
         results = [r() for r in results]
         obs, reward, done = zip(*[p[:3] for p in results])
         obs = list(obs)

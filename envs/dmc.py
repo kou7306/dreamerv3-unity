@@ -52,6 +52,7 @@ class DeepMindControl:
             reward += time_step.reward or 0
             if time_step.last():
                 break
+        print(f"Step: {time_step.observation}")
         obs = dict(time_step.observation)
         obs = {key: [val] if len(val.shape) == 0 else val for key, val in obs.items()}
         obs["image"] = self.render()
@@ -60,7 +61,9 @@ class DeepMindControl:
         obs["is_first"] = time_step.first()
         done = time_step.last()
         info = {"discount": np.array(time_step.discount, np.float32)}
+        print(f"Step: {obs}")
         return obs, reward, done, info
+    
 
     def reset(self):
         time_step = self._env.reset()
@@ -69,6 +72,7 @@ class DeepMindControl:
         obs["image"] = self.render()
         obs["is_terminal"] = False if time_step.first() else time_step.discount == 0
         obs["is_first"] = time_step.first()
+        print(f"Reset: {obs}")
         return obs
 
     def render(self, *args, **kwargs):
