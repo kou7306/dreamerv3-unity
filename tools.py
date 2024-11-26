@@ -128,7 +128,21 @@ class Logger:
         value = value.transpose(1, 4, 2, 0, 3).reshape((1, T, C, H, B * W))
         self._writer.add_video(name, value, step, 16)
 
-# エージェントが複数の環境と対話するシミュレーションを実行するための関数
+'''
+このコードは、エージェントと環境のインタラクションをシミュレートする関数 simulate です。主に強化学習におけるトレーニングや評価の際に使用され、エージェントが環境内で行動し、結果を収集して学習や評価を行う役割を果たします。以下にコードの各部分の詳細を解説します。
+
+引数
+agent: 強化学習エージェント。環境からの観察（observation）を受け取り、行動（action）を出力します。
+envs: 複数の環境（環境のリスト）。
+cache: 状態の履歴を保存するためのデータ構造（例えば、遷移の保存）。
+directory: ログやエピソードデータを保存するディレクトリ。
+logger: ログの記録に使用するオブジェクト。
+is_eval: 評価モードかどうかを示すフラグ（デフォルトは False）。
+limit: 環境で許可されるステップ数の上限（オプション）。
+steps: 進行するステップ数の制限（オプション）。
+episodes: 進行するエピソード数の制限（オプション）。
+state: 初期状態。前回のシミュレーション状態（省略可能）。
+'''
 def simulate(
     agent,
     envs,
@@ -141,7 +155,7 @@ def simulate(
     episodes=0,
     state=None,
 ):
-    # initialize or unpack simulation state
+    # 状態の初期化
     if state is None:
         step, episode = 0, 0
         done = np.ones(len(envs), bool)
@@ -153,13 +167,13 @@ def simulate(
         step, episode, done, length, obs, agent_state, reward = state
     # ステップやエピソードの切れ目でループを抜ける
     while (steps and step < steps) or (episodes and episode < episodes):
+        print(f"Step: {step}, Episode: {episode}")
         # reset envs if necessary
         if done.any():
             indices = [index for index, d in enumerate(done) if d]
             results = [envs[i].reset() for i in indices]
             results = [r() for r in results]
             for index, result in zip(indices, results):
-                print(result)
                 t = result.copy()
                 t = {k: convert(v) for k, v in t.items()}
                 # action will be added to transition in add_to_cache

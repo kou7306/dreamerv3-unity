@@ -193,6 +193,9 @@ class RSSM(nn.Module):
                 )
 
         prior = self.img_step(prev_state, prev_action)
+        # 次元数を確認
+        print(f"prior['deter'] shape: {prior['deter'].shape}")
+        print(f"embed shape: {embed.shape}")
         x = torch.cat([prior["deter"], embed], -1)
         # (batch_size, prior_deter + embed) -> (batch_size, hidden)
         x = self._obs_out_layers(x)
@@ -205,6 +208,7 @@ class RSSM(nn.Module):
         post = {"stoch": stoch, "deter": prior["deter"], **stats}
         return post, prior
 
+    # 前の状態（prev_state）と前のアクション（prev_action）を使用して、画像に基づいた新しい状態を生成する関数です。
     def img_step(self, prev_state, prev_action, sample=True):
         # (batch, stoch, discrete_num)
         prev_stoch = prev_state["stoch"]
