@@ -57,6 +57,7 @@ class Dreamer(nn.Module):
 
     def __call__(self, obs, reset, state=None, training=True):
         step = self._step
+        print("step", step)
         if training:
             steps = (
                 self._config.pretrain
@@ -84,32 +85,55 @@ class Dreamer(nn.Module):
         return policy_output, state
 
     def _policy(self, obs, state, training):
+        # 環境の初期化
         if state is None:
             latent = action = None
         else:
             latent, action = state
+        # エンコーディング
+        print("obs type:", type(obs))
+
         obs = self._wm.preprocess(obs)
         embed = self._wm.encoder(obs)
+
+        '''
+        obs_step は、観測とアクションに基づいて潜在状態 (latent) を更新するメソッドです。
+        ここで、latent と action が前のステップから渡され、embed（エンコードされた観測）と一緒に使用されます。
+        obs["is_first"] は、エピソードの最初のステップかどうかを示すフラグです。
+        '''
         latent, _ = self._wm.dynamics.obs_step(latent, action, embed, obs["is_first"])
         if self._config.eval_state_mean:
             latent["stoch"] = latent["mean"]
+
+        # 特徴量の取得
         feat = self._wm.dynamics.get_feat(latent)
+
+        # ポリシー決定
         if not training:
             actor = self._task_behavior.actor(feat)
             action = actor.mode()
         elif self._should_expl(self._step):
+            print("expl",self._expl_behavior)
             actor = self._expl_behavior.actor(feat)
             action = actor.sample()
+            print("action", action)
         else:
             actor = self._task_behavior.actor(feat)
             action = actor.sample()
+        
+        #  アクションの確率分布とログ確率の取得
         logprob = actor.log_prob(action)
+        #  潜在状態とアクションの分離
         latent = {k: v.detach() for k, v in latent.items()}
         action = action.detach()
+
+        #  onehot_gumble が設定されている場合、アクションを onehot に変換
         if self._config.actor["dist"] == "onehot_gumble":
             action = torch.one_hot(
                 torch.argmax(action, dim=-1), self._config.num_actions
             )
+        
+        # ポリシーの出力
         policy_output = {"action": action, "logprob": logprob}
         state = (latent, action)
         return policy_output, state

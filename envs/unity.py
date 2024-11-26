@@ -6,6 +6,7 @@ from mlagents_envs.environment import UnityEnvironment
 from mlagents_envs.base_env import ActionTuple
 from mlagents_envs.side_channel.engine_configuration_channel import EngineConfigurationChannel
 import os
+import cv2
 
 
 def get_available_port(start_port=5005, end_port=5100):
@@ -17,7 +18,7 @@ def get_available_port(start_port=5005, end_port=5100):
                 return port
             
 class UnityEnv:
-    def __init__(self, action_repeat=4, size=(84, 60), gray=True, noops=0, seed=None):
+    def __init__(self, action_repeat=4, size=(64, 64), gray=True, noops=0, seed=None):
         # Unity環境の設定
         self.channel = EngineConfigurationChannel()
         print(f"Unity Environment:")
@@ -74,8 +75,11 @@ class UnityEnv:
                 decision_steps, terminal_steps = self.env.get_steps(self._behavior_name)
 
                 if len(decision_steps.obs) > 1:
-                    print("position_x: ", decision_steps.obs[1][0, 0])
-                    print("position_z: ", decision_steps.obs[1][0, 1])
+                    # 配列としてx座標とz座標を取得
+                    position_x = np.array([decision_steps.obs[1][0, 0]])
+                    position_z = np.array([decision_steps.obs[1][0, 1]])
+                else:
+                    position_x, position_z = np.array([None]), np.array([None])
 
                 # 成功した場合はループを抜けて後続処理を実行
                 break
@@ -102,23 +106,26 @@ class UnityEnv:
                 break
 
         # 観測データの処理
-        if len(decision_steps.obs) > 1:
-            position_x = decision_steps.obs[1][0, 0]  # x座標
-            position_z = decision_steps.obs[1][0, 1]  # z座標
-        else:
-            position_x, position_z = None, None
         image = np.array(decision_steps.obs[0], dtype=np.uint8) if len(decision_steps.obs) > 0 else None
-        print("image: ", image)
+        if image is not None:
+            image = np.squeeze(image, axis=0)  # (1, 60, 84, 3) -> (60, 84, 3)
+            image = cv2.resize(image, self._size)
+
 
         obs = {
-            "position_x": position_x,
-            "position_z": position_z,
+            "position_x": position_x,  # 配列形式で格納
+            "position_z": position_z,  # 配列形式で格納
             "image": image,
             "is_first": False,  # 初回ではないためFalse
-            "is_terminate": is_terminate,  # エピソード終了かどうか
+            "is_terminal": is_terminate,  # エピソード終了かどうか
         }
 
+        print("Observation details:")
+        for key, val in obs.items():
+            print(f"Key: {key}, Shape: {np.shape(val)}, Type: {type(val)}")
+
         return obs, total_reward, is_terminate, {}
+
 
     def reset(self):
         print("before reset")
@@ -130,20 +137,27 @@ class UnityEnv:
             # 初期の観測データを取得
             initial_observation = decision_steps.obs[1]
             print(initial_observation)
-            position_x = initial_observation[0, 0]
-            position_z = initial_observation[0, 1]
+            # 配列としてx座標とz座標を取得
+            position_x = np.array([initial_observation[0, 0]])
+            position_z = np.array([initial_observation[0, 1]])
         else:
-            position_x, position_z = None, None
+            position_x, position_z = np.array([None]), np.array([None])
 
         image = np.array(decision_steps.obs[0], dtype=np.uint8) if len(decision_steps.obs) > 0 else None
+        if image is not None:
+            image = np.squeeze(image, axis=0)  # (1, 60, 84, 3) -> (60, 84, 3)
+            image = cv2.resize(image, self._size)
+
 
         obs = {
-            "position_x": position_x,
-            "position_z": position_z,
+            "position_x": position_x,  # 配列形式で格納
+            "position_z": position_z,  # 配列形式で格納
             "image": image,
             "is_first": True,  # 初回のリセット後はTrue
-            "is_terminate": False,  # リセット時は終了していない
+            "is_terminal": False,  # リセット時は終了していない
         }
+
+        print("step_obs", obs)
 
         return obs
 
