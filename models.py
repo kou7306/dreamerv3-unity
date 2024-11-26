@@ -185,7 +185,9 @@ class WorldModel(nn.Module):
         obs["cont"] = torch.Tensor(1.0 - obs["is_terminal"]).unsqueeze(-1)
         obs = {k: torch.Tensor(v).to(self._config.device) for k, v in obs.items()}
         return obs
+    
 
+    # エージェントが観測した画像を元に、未来の画像を予測するための処理
     def video_pred(self, data):
         data = self.preprocess(data)
         embed = self.encoder(data)
@@ -209,7 +211,9 @@ class WorldModel(nn.Module):
 
         return torch.cat([truth, model, error], 2)
 
-
+'''
+Actor-Criticのクラス
+'''
 class ImagBehavior(nn.Module):
     def __init__(self, config, world_model):
         super(ImagBehavior, self).__init__()
