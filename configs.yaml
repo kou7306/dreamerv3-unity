@@ -264,7 +264,7 @@ debug:
 unity:
   steps: 4e5
   envs: 1
-  action_repeat: 4
+  action_repeat: 2
   train_ratio: 1024
   video_pred_log: true
   eval_episode_num: 0
