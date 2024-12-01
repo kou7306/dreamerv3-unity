@@ -186,7 +186,7 @@ def simulate(
         # step agents
         obs = {k: np.stack([o[k] for o in obs]) for k in obs[0] if "log_" not in k}
 
-        # トレーニングの実行
+        # トレーニングの実行 ここで渡しているObsがそのまま世界モデルにも入力される
         action, agent_state = agent(obs, done, agent_state)
         if isinstance(action, dict):
             action = [
@@ -257,6 +257,8 @@ def simulate(
 
                     score = sum(eval_scores) / len(eval_scores)
                     length = sum(eval_lengths) / len(eval_lengths)
+
+                    # ここが真っ黒
                     logger.video(f"eval_policy", np.array(video)[None])
 
                     if len(eval_scores) >= episodes and not eval_done:

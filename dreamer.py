@@ -57,7 +57,7 @@ class Dreamer(nn.Module):
             plan2explore=lambda: expl.Plan2Explore(config, self._wm, reward),
         )[config.expl_behavior]().to(self._config.device)
 
-    # トレーニングしてから次の行動を決定(training=Trueの場合は学習、Falseの場合は評価)
+    # トレーニングしてから次の行動を決定(training=Trueの場合は学習または追加トレーニング、Falseの場合は評価)
     def __call__(self, obs, reset, state=None, training=True):
         step = self._step
         print("step", step)
@@ -102,9 +102,10 @@ class Dreamer(nn.Module):
         embed = self._wm.encoder(obs)
 
         '''
-        obs_step は、観測とアクションに基づいて潜在状態 (latent) を更新するメソッドです。
-        ここで、latent と action が前のステップから渡され、embed（エンコードされた観測）と一緒に使用されます。
+        obs_step は、観測とアクションに基づいて次の潜在状態 (latent) を更新するメソッドです。
+        ここで、latent(前回の潜在状態) と action(前回した行動) が前のステップから渡され、embed（エンコードされた観測）と一緒に使用されます。
         obs["is_first"] は、エピソードの最初のステップかどうかを示すフラグです。
+        次の潜在情報を使ってポリシーを学習
         '''
         latent, _ = self._wm.dynamics.obs_step(latent, action, embed, obs["is_first"])
         if self._config.eval_state_mean:
@@ -115,6 +116,7 @@ class Dreamer(nn.Module):
 
         # ポリシー決定
         if not training:
+            # 学習済みのポリシー
             actor = self._task_behavior.actor(feat)
             action = actor.mode()
         elif self._should_expl(self._step):
@@ -143,6 +145,7 @@ class Dreamer(nn.Module):
         state = (latent, action)
         return policy_output, state
 
+    # 世界モデルの学習
     def _train(self, data):
         metrics = {}
         post, context, mets = self._wm._train(data)
@@ -352,11 +355,11 @@ def main(config):
     ).to(config.device)
     agent.requires_grad_(requires_grad=False)
 
-    # 以前のトレーニング状態が保存されていれば、それをロード
+    # 以前のトレーニング状態が保存されていれば、それをロード(学習済モデルのロード)
     if (logdir / "latest.pt").exists():
         checkpoint = torch.load(logdir / "latest.pt")
-        agent.load_state_dict(checkpoint["agent_state_dict"])
-        tools.recursively_load_optim_state_dict(agent, checkpoint["optims_state_dict"])
+        agent.load_state_dict(checkpoint["agent_state_dict"]) # パラメータ復元
+        tools.recursively_load_optim_state_dict(agent, checkpoint["optims_state_dict"]) # オプティマイザの復元
         agent._should_pretrain._once = False
 
     # make sure eval will be executed once after config.steps
@@ -367,6 +370,7 @@ def main(config):
         logger.write()
         if config.eval_episode_num > 0:
             print("Start evaluation.")
+            # 評価環境を用いてトレーニングせず評価のみをする
             eval_policy = functools.partial(agent, training=False)
             tools.simulate(
                 eval_policy,
@@ -375,7 +379,7 @@ def main(config):
                 config.evaldir,
                 logger,
                 is_eval=True,
-                episodes=config.eval_episode_num,
+                episodes=config.eval_episode_num, # シミュレーションを実行する「エピソード数」
             )
 
             # 評価中にビデオ予測をログに記録

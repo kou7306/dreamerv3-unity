@@ -267,7 +267,7 @@ unity:
   action_repeat: 4
   train_ratio: 1024
   video_pred_log: true
-  eval_episode_num: 100
+  eval_episode_num: 0
   imag_gradient: "reinforce"
   noops: 30
   resize: opencv
