@@ -120,6 +120,9 @@ class UnityEnv:
                 last_decision_steps.obs[1][0, 2]   # 向き (例: ラジアン値)
             ]) if len(last_decision_steps.obs) > 1 else np.array([None])
 
+            print(f"relative_position: {relative_position}")
+            print(f"orientation: {orientation}")
+
             # 画像データ処理
             image = np.array(last_decision_steps.obs[0], dtype=np.float) if len(last_decision_steps.obs) > 0 else None
             if image is not None:
@@ -131,7 +134,8 @@ class UnityEnv:
             relative_position = np.array([None, None])
             orientation = np.array([None])
             image = None
-
+        
+        print(f"image: {image}")
         # 観測データの構築
         obs = {
             "image": image,
