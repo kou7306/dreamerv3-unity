@@ -171,7 +171,9 @@ class RSSM(nn.Module):
             )
         return dist
 
+    # 前の状態と前アクションを入力し、次の状態を予測 embedは他の情報?
     def obs_step(self, prev_state, prev_action, embed, is_first, sample=True):
+
         # initialize all prev_state
         if prev_state == None or torch.sum(is_first) == len(is_first):
             prev_state = self.initial(len(is_first))
@@ -326,7 +328,7 @@ class MultiEncoder(nn.Module):
         }
         print("Encoder CNN shapes:", self.cnn_shapes)
         print("Encoder MLP shapes:", self.mlp_shapes)
-
+        # 観測されたデータの種類でエンコーダーを使い分け
         self.outdim = 0
         if self.cnn_shapes:
             input_ch = sum([v[-1] for v in self.cnn_shapes.values()])

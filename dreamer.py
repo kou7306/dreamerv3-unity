@@ -24,12 +24,13 @@ from torch import distributions as torchd
 
 to_np = lambda x: x.detach().cpu().numpy()
 
-
+# エージェントのクラス
 class Dreamer(nn.Module):
     def __init__(self, obs_space, act_space, config, logger, dataset):
         super(Dreamer, self).__init__()
         self._config = config
         self._logger = logger
+        # 定期的に実行する関数を登録
         self._should_log = tools.Every(config.log_every)
         batch_steps = config.batch_size * config.batch_length
         self._should_train = tools.Every(batch_steps / config.train_ratio)
@@ -42,6 +43,7 @@ class Dreamer(nn.Module):
         self._update_count = 0
         self._dataset = dataset
         self._wm = models.WorldModel(obs_space, act_space, self._step, config)
+        # 行動ポリシーの初期化
         self._task_behavior = models.ImagBehavior(config, self._wm)
         if (
             config.compile and os.name != "nt"
@@ -55,6 +57,7 @@ class Dreamer(nn.Module):
             plan2explore=lambda: expl.Plan2Explore(config, self._wm, reward),
         )[config.expl_behavior]().to(self._config.device)
 
+    # トレーニングしてから次の行動を決定(training=Trueの場合は学習または追加トレーニング、Falseの場合は評価)
     def __call__(self, obs, reset, state=None, training=True):
         step = self._step
         print("step", step)
@@ -72,11 +75,13 @@ class Dreamer(nn.Module):
                 for name, values in self._metrics.items():
                     self._logger.scalar(name, float(np.mean(values)))
                     self._metrics[name] = []
+                # ビデオ予測の記録(入力は画像だけど)
                 if self._config.video_pred_log:
                     openl = self._wm.video_pred(next(self._dataset))
                     self._logger.video("train_openl", to_np(openl))
                 self._logger.write(fps=True)
 
+        # 行動ポリシーの実行(次の行動)
         policy_output, state = self._policy(obs, state, training)
 
         if training:
@@ -97,9 +102,10 @@ class Dreamer(nn.Module):
         embed = self._wm.encoder(obs)
 
         '''
-        obs_step は、観測とアクションに基づいて潜在状態 (latent) を更新するメソッドです。
-        ここで、latent と action が前のステップから渡され、embed（エンコードされた観測）と一緒に使用されます。
+        obs_step は、観測とアクションに基づいて次の潜在状態 (latent) を更新するメソッドです。
+        ここで、latent(前回の潜在状態) と action(前回した行動) が前のステップから渡され、embed（エンコードされた観測）と一緒に使用されます。
         obs["is_first"] は、エピソードの最初のステップかどうかを示すフラグです。
+        次の潜在情報を使ってポリシーを学習
         '''
         latent, _ = self._wm.dynamics.obs_step(latent, action, embed, obs["is_first"])
         if self._config.eval_state_mean:
@@ -110,6 +116,7 @@ class Dreamer(nn.Module):
 
         # ポリシー決定
         if not training:
+            # 学習済みのポリシー
             actor = self._task_behavior.actor(feat)
             action = actor.mode()
         elif self._should_expl(self._step):
@@ -138,9 +145,11 @@ class Dreamer(nn.Module):
         state = (latent, action)
         return policy_output, state
 
+    # 世界モデルの学習
     def _train(self, data):
         metrics = {}
         post, context, mets = self._wm._train(data)
+        # 記録
         metrics.update(mets)
         start = post
         reward = lambda f, s, a: self._wm.heads["reward"](
@@ -244,7 +253,8 @@ def main(config):
         tools.enable_deterministic_run()
     logdir = pathlib.Path(config.logdir).expanduser()
 
-    config.traindir = config.traindir or logdir / "train_eps"
+    # 様々な処理の頻度を調整
+    config.traindir = config.traindir or logdir / "train_eps" # エピソードデータの保存やロード
     config.evaldir = config.evaldir or logdir / "eval_eps"
     config.steps //= config.action_repeat
     config.eval_every //= config.action_repeat
@@ -274,6 +284,7 @@ def main(config):
     make = lambda mode, id: make_env(config, mode, id)
     train_envs = [make("train", i) for i in range(config.envs)]
     eval_envs = [make("eval", i) for i in range(config.envs)]
+    # パラレル処理を行うかどうか
     if config.parallel:
         train_envs = [Parallel(env, "process") for env in train_envs]
         eval_envs = [Parallel(env, "process") for env in eval_envs]
@@ -285,6 +296,12 @@ def main(config):
     config.num_actions = acts.n if hasattr(acts, "n") else acts.shape[0]
 
     state = None
+    # 事前にデータセットを初期化
+    '''
+    環境のアクションスペースに応じて、ランダムアクターを生成します。
+    離散空間の場合、One-Hot エンコーディングでサンプリング。
+    連続空間の場合、均等分布でサンプリング
+    '''
     if not config.offline_traindir:
         prefill = max(0, config.prefill - count_steps(config.traindir))
         print(f"Prefill dataset ({prefill} steps).")
@@ -305,7 +322,8 @@ def main(config):
             action = random_actor.sample()
             logprob = random_actor.log_prob(action)
             return {"action": action, "logprob": logprob}, None
-
+        
+        # ランダムアクターを使用してデータセットを事前に準備
         state = tools.simulate(
             random_agent,
             train_envs,
@@ -318,7 +336,14 @@ def main(config):
         logger.step += prefill * config.action_repeat
         print(f"Logger: ({logger.step} steps).")
 
-    print("Simulate agent.")
+    print("Prefillをおこなう。")
+    '''
+    エピソードを分割:
+    エピソードを config.batch_length（例えば5ステップ）で切り分ける。
+    データのジェネレーター化:
+    切り分けたエピソードをランダムにサンプリングするジェネレーターを作成。
+    これでバッチ的にデータを生成する。
+    '''
     train_dataset = make_dataset(train_eps, config)
     eval_dataset = make_dataset(eval_eps, config)
     agent = Dreamer(
@@ -329,18 +354,23 @@ def main(config):
         train_dataset,
     ).to(config.device)
     agent.requires_grad_(requires_grad=False)
+
+    # 以前のトレーニング状態が保存されていれば、それをロード(学習済モデルのロード)
     if (logdir / "latest.pt").exists():
         checkpoint = torch.load(logdir / "latest.pt")
-        agent.load_state_dict(checkpoint["agent_state_dict"])
-        tools.recursively_load_optim_state_dict(agent, checkpoint["optims_state_dict"])
+        agent.load_state_dict(checkpoint["agent_state_dict"]) # パラメータ復元
+        tools.recursively_load_optim_state_dict(agent, checkpoint["optims_state_dict"]) # オプティマイザの復元
         agent._should_pretrain._once = False
 
     # make sure eval will be executed once after config.steps
+    # トレーニングと評価のループ(学習終了まで続くループ)
     while agent._step < config.steps + config.eval_every:
         print("Start episode.")
+        # 現在のトレーニング状態（ステップ数や報酬など）をログに記録
         logger.write()
         if config.eval_episode_num > 0:
             print("Start evaluation.")
+            # 評価環境を用いてトレーニングせず評価のみをする
             eval_policy = functools.partial(agent, training=False)
             tools.simulate(
                 eval_policy,
@@ -349,8 +379,10 @@ def main(config):
                 config.evaldir,
                 logger,
                 is_eval=True,
-                episodes=config.eval_episode_num,
+                episodes=config.eval_episode_num, # シミュレーションを実行する「エピソード数」
             )
+
+            # 評価中にビデオ予測をログに記録
             if config.video_pred_log:
                 video_pred = agent._wm.video_pred(next(eval_dataset))
                 logger.video("eval_openl", to_np(video_pred))

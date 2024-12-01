@@ -19,7 +19,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 to_np = lambda x: x.detach().cpu().numpy()
 
-
+# ヘルパー関数を定義
 def symlog(x):
     return torch.sign(x) * torch.log(torch.abs(x) + 1.0)
 
@@ -53,7 +53,7 @@ class TimeRecording:
         torch.cuda.synchronize()
         print(self._comment, self._st.elapsed_time(self._nd) / 1000)
 
-
+# ロガーのクラス
 class Logger:
     def __init__(self, logdir, step):
         self._logdir = logdir
@@ -88,8 +88,12 @@ class Logger:
                 self._writer.add_scalar("scalars/" + name, value, step)
             else:
                 self._writer.add_scalar(name, value, step)
+
+        # 画像の記録
         for name, value in self._images.items():
             self._writer.add_image(name, value, step)
+        
+        # ビデオの記録
         for name, value in self._videos.items():
             name = name if isinstance(name, str) else name.decode("utf-8")
             if np.issubdtype(value.dtype, np.floating):
@@ -161,7 +165,7 @@ def simulate(
         reward = [0] * len(envs)
     else:
         step, episode, done, length, obs, agent_state, reward = state
-    # シミュレーションの実行(step)
+    # ステップやエピソードの切れ目でループを抜ける
     while (steps and step < steps) or (episodes and episode < episodes):
         print(f"Step: {step}, Episode: {episode}")
         # reset envs if necessary
@@ -181,8 +185,8 @@ def simulate(
                 obs[index] = result
         # step agents
         obs = {k: np.stack([o[k] for o in obs]) for k in obs[0] if "log_" not in k}
-        print("agent go")
-        # agentの行動を取得
+
+        # トレーニングの実行 ここで渡しているObsがそのまま世界モデルにも入力される
         action, agent_state = agent(obs, done, agent_state)
         if isinstance(action, dict):
             action = [
@@ -253,6 +257,8 @@ def simulate(
 
                     score = sum(eval_scores) / len(eval_scores)
                     length = sum(eval_lengths) / len(eval_lengths)
+
+                    # ここが真っ黒
                     logger.video(f"eval_policy", np.array(video)[None])
 
                     if len(eval_scores) >= episodes and not eval_done:
