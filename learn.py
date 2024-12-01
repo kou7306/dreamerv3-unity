@@ -83,7 +83,16 @@ def train_agv():
                     print(f"Data Type: {image.dtype}")
                     print(f"Min Value: {image.min()}")
                     print(f"Max Value: {image.max()}")
-                    
+
+                    print(decision_steps.obs[1])
+
+                    relative_position = (decision_steps.obs[1][0][0], decision_steps.obs[1][0][1])
+
+                    relative_angle = decision_steps.obs[1][0][2]       # 相対角度
+
+                    # 出力
+                    print(f"  Relative Position: {relative_position}")
+                    print(f"  Relative Angle: {relative_angle}")
 
                 
                 # ランダムな行動の生成と実行
