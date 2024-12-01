@@ -4,28 +4,30 @@ from mlagents_envs.side_channel.engine_configuration_channel import EngineConfig
 
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from PIL import Image
+import matplotlib.pyplot as plt
 
 def display_camera_observation(observation):
     """カメラ観測データを表示する関数"""
-    # 観測データの形状を確認
     print(f"Camera observation shape: {observation.shape}")
     
-    # グレースケールとカラーで処理を分ける
+    # 画像のスケーリング: [0, 1] → [0, 255]
+    observation = np.clip(observation * 255, 0, 255).astype(np.uint8)
+    
     if len(observation.shape) == 2:  # グレースケール
         plt.imshow(observation, cmap='gray')
     else:  # カラー
-        # Unity からの観測データは [H, W, C] 形式
         plt.imshow(observation)
     
-    plt.axis('off')
-    plt.show()
+    plt.axis('off')  # 軸を非表示にする
+    plt.show()  # 画像を表示
+
 
 def train_agv():
     # Unity環境の設定
     channel = EngineConfigurationChannel()
-    env = UnityEnvironment(file_name="UnityBuild2.x86_64", side_channels=[channel])
+    env = UnityEnvironment(file_name=None, side_channels=[channel])
     env.reset()
     
     # 環境の設定
@@ -51,24 +53,38 @@ def train_agv():
     for episode in range(10):
         print(f"\nStarting episode {episode + 1}...")
         env.reset()
-        decision_steps, terminal_steps = env.get_steps(behavior_name)
         
         step_count = 0
-        while True:
-            if len(decision_steps) > 0:
-                print(decision_steps)
-                # ベクター観測とカメラ観測の取得
-                vector_obs = decision_steps.obs[1]  # ベクター観測
-                camera_obs = decision_steps.obs[0]  # カメラ観測
-                
-                # 10ステップごとにカメラ画像を表示
-                if step_count % 10 == 0:
-                    print(f"\nStep {step_count}")
-                    print(f"Vector observation shape: {vector_obs.shape}")
-                    print(f"Camera observation shape: {camera_obs.shape}")
+        while step_count < 1000:
+            decision_steps, terminal_steps = env.get_steps(behavior_name)
+            if len(decision_steps) > 0: 
+                print(f"decision_steps: {decision_steps}")
+
+                # カメラ画像を行列として取得（浮動小数点型のまま）
+                image = np.array(decision_steps.obs[0], dtype=np.float32) if len(decision_steps.obs) > 0 else None
+
+                if image is not None:
+                    image = np.squeeze(image, axis=0)  # (1, 60, 84, 3) -> (60, 84, 3)
                     
-                    # カメラ画像の表示
-                    display_camera_observation(camera_obs[0])  # 最初のエージェントの観測のみ表示
+                    # 画像のスケーリング: [0, 1] → [0, 255]（整数型に変換せず表示）
+                    # image = np.clip(image * 255, 0, 255)  # 0〜255にスケーリング
+
+                    # 画像の表示
+                    display_camera_observation(image)
+
+                        
+                    # 行列の詳細を出力
+                    print("Camera Image Matrix:")
+                    print(image)
+                    
+                    # 行列の形状と詳細情報
+                    print("\nMatrix Details:")
+                    print(f"Shape: {image.shape}")
+                    print(f"Data Type: {image.dtype}")
+                    print(f"Min Value: {image.min()}")
+                    print(f"Max Value: {image.max()}")
+                    
+
                 
                 # ランダムな行動の生成と実行
                 random_action = np.random.uniform(low=-1.0, high=1.0, size=(1, action_dim))
@@ -88,7 +104,7 @@ def train_agv():
                 # 終了時のカメラ画像も表示
                 if len(terminal_steps.obs) > 1:  # カメラ観測が存在する場合
                     print("Terminal observation:")
-                    display_camera_observation(terminal_steps.obs[1][0])
+                    # display_camera_observation(terminal_steps.obs[1][0])
                 break
     
     env.close()

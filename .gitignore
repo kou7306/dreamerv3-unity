@@ -139,3 +139,5 @@ dmypy.json
 .vscode/*
 
 UnityBuild4_Data
+UnityBuild5_Data
+vtc_unity_BurstDebugInformation_DoNotShip

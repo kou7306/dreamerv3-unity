@@ -27,9 +27,10 @@ class UnityEnv:
 
         # ランダムに使用可能なポートを取得
         base_port = get_available_port()
+        print(f"Base port: {base_port}")
 
         # 使用可能なポートでUnityEnvironmentを起動
-        self.env = UnityEnvironment(file_name="UnityBuild4", base_port=base_port, side_channels=[self.channel])
+        self.env = UnityEnvironment(file_name="UnityBuild5", base_port=base_port, side_channels=[self.channel])
 
         self.env.reset()
         print("Reset environment")
@@ -45,15 +46,16 @@ class UnityEnv:
         behavior_name = list(self.env.behavior_specs)[0]
         self.spec = self.env.behavior_specs[behavior_name]
         self._behavior_name = behavior_name
-        self._state_dim = self.spec.observation_specs[0].shape[0]
+        if(len(self.spec.observation_specs) > 1):
+            self._state_dim = self.spec.observation_specs[0].shape[0]
         self._action_dim = self.spec.action_spec.continuous_size
         
     @property
     def observation_space(self):
         return spaces.Dict({
-            "observation": spaces.Box(low=-np.inf, high=np.inf, shape=(self._state_dim,), dtype=np.float32),
+            # "observation": spaces.Box(low=-np.inf, high=np.inf, shape=(self._state_dim,), dtype=np.float32),
             # 他の観測データがある場合は追加
-            "image": spaces.Box(0, 255, self._size + (3,), dtype=np.uint8)
+            "image": spaces.Box(0, 255, self._size + (3,), dtype=np.float32)
         })
 
     @property
@@ -106,15 +108,15 @@ class UnityEnv:
                 break
 
         # 観測データの処理
-        image = np.array(decision_steps.obs[0], dtype=np.uint8) if len(decision_steps.obs) > 0 else None
+        image = np.array(decision_steps.obs[0], dtype=np.float) if len(decision_steps.obs) > 0 else None
         if image is not None:
             image = np.squeeze(image, axis=0)  # (1, 60, 84, 3) -> (60, 84, 3)
+            image = np.clip(image * 255, 0, 255)  # 0〜255にスケーリング
             image = cv2.resize(image, self._size)
 
 
+        print("image", image)
         obs = {
-            "position_x": position_x,  # 配列形式で格納
-            "position_z": position_z,  # 配列形式で格納
             "image": image,
             "is_first": False,  # 初回ではないためFalse
             "is_terminal": is_terminate,  # エピソード終了かどうか
@@ -143,15 +145,15 @@ class UnityEnv:
         else:
             position_x, position_z = np.array([None]), np.array([None])
 
-        image = np.array(decision_steps.obs[0], dtype=np.uint8) if len(decision_steps.obs) > 0 else None
+        # 観測データの処理
+        image = np.array(decision_steps.obs[0], dtype=np.float) if len(decision_steps.obs) > 0 else None
         if image is not None:
             image = np.squeeze(image, axis=0)  # (1, 60, 84, 3) -> (60, 84, 3)
+            image = np.clip(image * 255, 0, 255)  # 0〜255にスケーリング
             image = cv2.resize(image, self._size)
 
 
         obs = {
-            "position_x": position_x,  # 配列形式で格納
-            "position_z": position_z,  # 配列形式で格納
             "image": image,
             "is_first": True,  # 初回のリセット後はTrue
             "is_terminal": False,  # リセット時は終了していない
