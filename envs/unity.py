@@ -71,108 +71,108 @@ class UnityEnv:
         # 連続的なアクション空間
         return spaces.Box(low=-1.0, high=1.0, shape=(self._action_dim,), dtype=np.float32)
 
-def step(self, action):
-    retries = 3  # リトライ回数の上限
-    for attempt in range(retries):
-        try:
-            # 初回のアクションをUnity形式に変換
+    def step(self, action):
+        retries = 3  # リトライ回数の上限
+        for attempt in range(retries):
+            try:
+                # 初回のアクションをUnity形式に変換
+                action_tuple = ActionTuple(continuous=np.array([action]))
+                self.env.set_actions(self._behavior_name, action_tuple)
+                self.env.step()
+                # 成功した場合はリトライループを抜ける
+                break
+            except Exception as e:
+                print(f"Step failed on attempt {attempt + 1} with error: {e}")
+                if attempt == retries - 1:
+                    raise
+
+        total_reward = 0.0
+        is_terminate = False
+        last_decision_steps = None  # 最後の観測データを格納する変数
+        for repeat in range(self._action_repeat):
+            # アクション設定と進行
             action_tuple = ActionTuple(continuous=np.array([action]))
             self.env.set_actions(self._behavior_name, action_tuple)
             self.env.step()
-            # 成功した場合はリトライループを抜ける
-            break
-        except Exception as e:
-            print(f"Step failed on attempt {attempt + 1} with error: {e}")
-            if attempt == retries - 1:
-                raise
 
-    total_reward = 0.0
-    is_terminate = False
-    last_decision_steps = None  # 最後の観測データを格納する変数
-    for repeat in range(self._action_repeat):
-        # アクション設定と進行
-        action_tuple = ActionTuple(continuous=np.array([action]))
-        self.env.set_actions(self._behavior_name, action_tuple)
-        self.env.step()
+            # 観測データを取得
+            decision_steps, terminal_steps = self.env.get_steps(self._behavior_name)
 
-        # 観測データを取得
+            # 報酬を累積
+            total_reward += decision_steps.reward[0]
+
+            # エピソード終了判定
+            if len(terminal_steps) > 0:
+                is_terminate = True
+                break
+
+            # 最後の観測データを更新
+            last_decision_steps = decision_steps
+
+        # 最後の観測データが存在する場合のみ処理
+        if last_decision_steps is not None:
+            relative_position = np.array([
+                last_decision_steps.obs[1][0, 0],  # x座標
+                last_decision_steps.obs[1][0, 1]   # z座標
+            ]) if len(last_decision_steps.obs) > 1 else np.array([None, None])
+
+            orientation = np.array([
+                last_decision_steps.obs[1][0, 2]   # 向き (例: ラジアン値)
+            ]) if len(last_decision_steps.obs) > 1 else np.array([None])
+
+            # 画像データ処理
+            image = np.array(last_decision_steps.obs[0], dtype=np.float) if len(last_decision_steps.obs) > 0 else None
+            if image is not None:
+                image = np.squeeze(image, axis=0)  # (1, 60, 84, 3) -> (60, 84, 3)
+                image = np.clip(image * 255, 0, 255)  # 0〜255にスケーリング
+                image = cv2.resize(image, self._size)
+        else:
+            # デフォルト値を設定
+            relative_position = np.array([None, None])
+            orientation = np.array([None])
+            image = None
+
+        # 観測データの構築
+        obs = {
+            "image": image,
+            "relative_position": relative_position,
+            "orientation": orientation,
+            "is_first": False,
+            "is_terminal": is_terminate,
+        }
+
+        return obs, total_reward, is_terminate, {}
+
+
+    def reset(self):
+        self.env.reset()
         decision_steps, terminal_steps = self.env.get_steps(self._behavior_name)
 
-        # 報酬を累積
-        total_reward += decision_steps.reward[0]
+        if len(decision_steps.obs) > 1:
+            initial_observation = decision_steps.obs[1]
+            relative_position = np.array([
+                initial_observation[0, 0],  # x座標
+                initial_observation[0, 1]   # z座標
+            ])
+            orientation = np.array([
+                initial_observation[0, 2]   # 向き (例: ラジアン値)
+            ])
+        else:
+            relative_position = np.array([None, None])
+            orientation = np.array([None])
 
-        # エピソード終了判定
-        if len(terminal_steps) > 0:
-            is_terminate = True
-            break
-
-        # 最後の観測データを更新
-        last_decision_steps = decision_steps
-
-    # 最後の観測データが存在する場合のみ処理
-    if last_decision_steps is not None:
-        relative_position = np.array([
-            last_decision_steps.obs[1][0, 0],  # x座標
-            last_decision_steps.obs[1][0, 1]   # z座標
-        ]) if len(last_decision_steps.obs) > 1 else np.array([None, None])
-
-        orientation = np.array([
-            last_decision_steps.obs[1][0, 2]   # 向き (例: ラジアン値)
-        ]) if len(last_decision_steps.obs) > 1 else np.array([None])
-
-        # 画像データ処理
-        image = np.array(last_decision_steps.obs[0], dtype=np.float) if len(last_decision_steps.obs) > 0 else None
+        image = np.array(decision_steps.obs[0], dtype=np.float) if len(decision_steps.obs) > 0 else None
         if image is not None:
             image = np.squeeze(image, axis=0)  # (1, 60, 84, 3) -> (60, 84, 3)
             image = np.clip(image * 255, 0, 255)  # 0〜255にスケーリング
             image = cv2.resize(image, self._size)
-    else:
-        # デフォルト値を設定
-        relative_position = np.array([None, None])
-        orientation = np.array([None])
-        image = None
 
-    # 観測データの構築
-    obs = {
-        "image": image,
-        "relative_position": relative_position,
-        "orientation": orientation,
-        "is_first": False,
-        "is_terminal": is_terminate,
-    }
+        obs = {
+            "image": image,
+            "relative_position": relative_position,
+            "orientation": orientation,
+            "is_first": True,
+            "is_terminal": False,
+        }
 
-    return obs, total_reward, is_terminate, {}
-
-
-def reset(self):
-    self.env.reset()
-    decision_steps, terminal_steps = self.env.get_steps(self._behavior_name)
-
-    if len(decision_steps.obs) > 1:
-        initial_observation = decision_steps.obs[1]
-        relative_position = np.array([
-            initial_observation[0, 0],  # x座標
-            initial_observation[0, 1]   # z座標
-        ])
-        orientation = np.array([
-            initial_observation[0, 2]   # 向き (例: ラジアン値)
-        ])
-    else:
-        relative_position = np.array([None, None])
-        orientation = np.array([None])
-
-    image = np.array(decision_steps.obs[0], dtype=np.float) if len(decision_steps.obs) > 0 else None
-    if image is not None:
-        image = np.squeeze(image, axis=0)  # (1, 60, 84, 3) -> (60, 84, 3)
-        image = np.clip(image * 255, 0, 255)  # 0〜255にスケーリング
-        image = cv2.resize(image, self._size)
-
-    obs = {
-        "image": image,
-        "relative_position": relative_position,
-        "orientation": orientation,
-        "is_first": True,
-        "is_terminal": False,
-    }
-
-    return obs
+        return obs
