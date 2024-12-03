@@ -196,8 +196,8 @@ class RSSM(nn.Module):
 
         prior = self.img_step(prev_state, prev_action)
         # 次元数を確認
-        print(f"prior['deter'] shape: {prior['deter'].shape}")
-        print(f"embed shape: {embed.shape}")
+        # print(f"prior['deter'] shape: {prior['deter'].shape}")
+        # print(f"embed shape: {embed.shape}") # ここが出力されるのはどういうとき?
         x = torch.cat([prior["deter"], embed], -1)
         # (batch_size, prior_deter + embed) -> (batch_size, hidden)
         x = self._obs_out_layers(x)

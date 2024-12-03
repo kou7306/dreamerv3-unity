@@ -31,7 +31,7 @@ class UnityEnv:
 
         # 使用可能なポートでUnityEnvironmentを起動
         self.env = UnityEnvironment(file_name="UnityBuild5", base_port=base_port, side_channels=[self.channel])
-
+        # self.env = UnityEnvironment(file_name=None, base_port=base_port, side_channels=[self.channel])
         self.env.reset()
         print("Reset environment")
 
@@ -93,21 +93,26 @@ class UnityEnv:
             # アクション設定と進行
             action_tuple = ActionTuple(continuous=np.array([action]))
             self.env.set_actions(self._behavior_name, action_tuple)
+            print("action set",action)
             self.env.step()
 
             # 観測データを取得
             decision_steps, terminal_steps = self.env.get_steps(self._behavior_name)
-
+            print("decision_steps:", decision_steps.obs)
             # 報酬を累積
             total_reward += decision_steps.reward[0]
+            # 最後の観測データを更新
+            last_decision_steps = decision_steps
 
             # エピソード終了判定
             if len(terminal_steps) > 0:
                 is_terminate = True
+                print("Episode terminated")
                 break
 
-            # 最後の観測データを更新
-            last_decision_steps = decision_steps
+
+
+        print(f"Total Reward: {total_reward}")
 
         # 最後の観測データが存在する場合のみ処理
         if last_decision_steps is not None:
@@ -134,8 +139,7 @@ class UnityEnv:
             relative_position = np.array([None, None])
             orientation = np.array([None])
             image = None
-        
-        print(f"image: {image}")
+
         # 観測データの構築
         obs = {
             "image": image,

@@ -166,10 +166,12 @@ def simulate(
     else:
         step, episode, done, length, obs, agent_state, reward = state
     # ステップやエピソードの切れ目でループを抜ける
+    print(f"limitStep: {steps}, limitEpisode: {episodes}")
     while (steps and step < steps) or (episodes and episode < episodes):
-        print(f"Step: {step}, Episode: {episode}")
+        print(f"Step: {step}, Episode: {episode}") # 現在のステップ数とエピソード数を表示
         # reset envs if necessary
         if done.any():
+            print("Resetting environments...リセット")
             indices = [index for index, d in enumerate(done) if d]
             results = [envs[i].reset() for i in indices]
             results = [r() for r in results]
@@ -196,7 +198,7 @@ def simulate(
         else:
             action = np.array(action)
         assert len(action) == len(envs)
-        # step envs
+        # step envs ステップを進める
         print(action)
         results = [e.step(a) for e, a in zip(envs, action)]
         print(results)
