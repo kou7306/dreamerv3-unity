@@ -68,7 +68,7 @@ class Dreamer(nn.Module):
                 else self._should_train(step)
             )
 
-            print("train steps", steps)
+            print("訓練を1回のステップで何回繰り返すか?", steps)
             for _ in range(steps):
                 self._train(next(self._dataset))
                 self._update_count += 1
@@ -285,7 +285,9 @@ def main(config):
     if config.offline_evaldir:
         directory = config.offline_evaldir.format(**vars(config))
     else:
+        print("2", directory)
         directory = config.evaldir
+    print("directory", directory)
     eval_eps = tools.load_episodes(directory, limit=1)
     print("config" ,config)
     make = lambda mode, id: make_env(config, mode, id)

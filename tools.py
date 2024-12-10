@@ -393,10 +393,12 @@ def load_episodes(directory, limit=None, reverse=True):
     directory = pathlib.Path(directory).expanduser()
     episodes = collections.OrderedDict()
     total = 0
+    print(f"Loading episodes from {directory}")
     if reverse:
         for filename in reversed(sorted(directory.glob("*.npz"))):
             try:
                 with filename.open("rb") as f:
+                    print(f"Loading {filename}")
                     episode = np.load(f)
                     episode = {k: episode[k] for k in episode.keys()}
             except Exception as e:
@@ -406,11 +408,13 @@ def load_episodes(directory, limit=None, reverse=True):
             episodes[str(os.path.splitext(os.path.basename(filename))[0])] = episode
             total += len(episode["reward"]) - 1
             if limit and total >= limit:
+                print("Loaded episodes up to limit")
                 break
     else:
         for filename in sorted(directory.glob("*.npz")):
             try:
                 with filename.open("rb") as f:
+                    print(f"Loading {filename}")
                     episode = np.load(f)
                     episode = {k: episode[k] for k in episode.keys()}
             except Exception as e:
@@ -419,6 +423,7 @@ def load_episodes(directory, limit=None, reverse=True):
             episodes[str(filename)] = episode
             total += len(episode["reward"]) - 1
             if limit and total >= limit:
+                print("Loaded episodes up to limit")
                 break
     return episodes
 

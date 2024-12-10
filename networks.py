@@ -318,6 +318,7 @@ class MultiEncoder(nn.Module):
             for k, v in shapes.items()
             if k not in excluded and not k.startswith("log_")
         }
+        # ここで型によって適用されるエンコーダーの種類を決定
         self.cnn_shapes = {
             k: v for k, v in shapes.items() if len(v) == 3 and re.match(cnn_keys, k)
         }
