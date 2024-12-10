@@ -119,7 +119,7 @@ defaults:
   model_lr: 1e-4
   opt_eps: 1e-8
   grad_clip: 1000
-  dataset_size: 1000000
+  dataset_size: 1000000 # 過去の保存するステップ数の上限
   opt: "adam"
 
   # Behavior.
@@ -262,16 +262,15 @@ debug:
   batch_length: 20
 
 unity:
-  steps: 4e5
-  envs: 1
-  action_repeat: 2
-  train_ratio: 1024
+  steps: 1e6 # 総ステップ数
+  envs: 5
+  action_repeat: 1
+  train_ratio: 512
   video_pred_log: true
-  eval_episode_num: 0
+  eval_episode_num: 40
   imag_gradient: "reinforce"
   noops: 30
   resize: opencv
-  actions: needed
-  time_limit: 108000
+  time_limit: 100000
   # unity_file: "vtc_unity"
   task: "unity_robot"

@@ -58,7 +58,7 @@ def train_agv():
         while step_count < 1000:
             decision_steps, terminal_steps = env.get_steps(behavior_name)
             if len(decision_steps) > 0: 
-                print(f"decision_steps: {decision_steps}")
+                print(f"\nStep {step_count + 1}")
 
                 # カメラ画像を行列として取得（浮動小数点型のまま）
                 image = np.array(decision_steps.obs[0], dtype=np.float32) if len(decision_steps.obs) > 0 else None
@@ -70,7 +70,7 @@ def train_agv():
                     # image = np.clip(image * 255, 0, 255)  # 0〜255にスケーリング
 
                     # 画像の表示
-                    display_camera_observation(image)
+                    # display_camera_observation(image)
 
                         
                     # 行列の詳細を出力
@@ -81,8 +81,8 @@ def train_agv():
                     print("\nMatrix Details:")
                     print(f"Shape: {image.shape}")
                     print(f"Data Type: {image.dtype}")
-                    print(f"Min Value: {image.min()}")
-                    print(f"Max Value: {image.max()}")
+                    print(f"reward: {decision_steps.reward[0]}")
+
                     
 
                 

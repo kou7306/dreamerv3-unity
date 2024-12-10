@@ -166,10 +166,12 @@ def simulate(
     else:
         step, episode, done, length, obs, agent_state, reward = state
     # ステップやエピソードの切れ目でループを抜ける
+    print(f"limitStep: {steps}, limitEpisode: {episodes}")
     while (steps and step < steps) or (episodes and episode < episodes):
-        print(f"Step: {step}, Episode: {episode}")
+        print(f"Step: {step}, Episode: {episode}") # 現在のステップ数とエピソード数を表示
         # reset envs if necessary
         if done.any():
+            print("Resetting environments...リセット")
             indices = [index for index, d in enumerate(done) if d]
             results = [envs[i].reset() for i in indices]
             results = [r() for r in results]
@@ -196,7 +198,7 @@ def simulate(
         else:
             action = np.array(action)
         assert len(action) == len(envs)
-        # step envs
+        # step envs ステップを進める
         print(action)
         results = [e.step(a) for e, a in zip(envs, action)]
         print(results)
@@ -391,10 +393,12 @@ def load_episodes(directory, limit=None, reverse=True):
     directory = pathlib.Path(directory).expanduser()
     episodes = collections.OrderedDict()
     total = 0
+    print(f"Loading episodes from {directory}")
     if reverse:
         for filename in reversed(sorted(directory.glob("*.npz"))):
             try:
                 with filename.open("rb") as f:
+                    print(f"Loading {filename}")
                     episode = np.load(f)
                     episode = {k: episode[k] for k in episode.keys()}
             except Exception as e:
@@ -404,11 +408,13 @@ def load_episodes(directory, limit=None, reverse=True):
             episodes[str(os.path.splitext(os.path.basename(filename))[0])] = episode
             total += len(episode["reward"]) - 1
             if limit and total >= limit:
+                print("Loaded episodes up to limit")
                 break
     else:
         for filename in sorted(directory.glob("*.npz")):
             try:
                 with filename.open("rb") as f:
+                    print(f"Loading {filename}")
                     episode = np.load(f)
                     episode = {k: episode[k] for k in episode.keys()}
             except Exception as e:
@@ -417,6 +423,7 @@ def load_episodes(directory, limit=None, reverse=True):
             episodes[str(filename)] = episode
             total += len(episode["reward"]) - 1
             if limit and total >= limit:
+                print("Loaded episodes up to limit")
                 break
     return episodes
 

@@ -38,7 +38,7 @@ class Dreamer(nn.Module):
         self._should_reset = tools.Every(config.reset_every)
         self._should_expl = tools.Until(int(config.expl_until / config.action_repeat))
         self._metrics = {}
-        # this is update step
+        # logger.stepは前回までの環境のステップ数
         self._step = logger.step // config.action_repeat
         self._update_count = 0
         self._dataset = dataset
@@ -67,6 +67,8 @@ class Dreamer(nn.Module):
                 if self._should_pretrain()
                 else self._should_train(step)
             )
+
+            print("訓練を1回のステップで何回繰り返すか?", steps)
             for _ in range(steps):
                 self._train(next(self._dataset))
                 self._update_count += 1
@@ -81,10 +83,13 @@ class Dreamer(nn.Module):
                     self._logger.video("train_openl", to_np(openl))
                 self._logger.write(fps=True)
 
+        print("start policy")
         # 行動ポリシーの実行(次の行動)
         policy_output, state = self._policy(obs, state, training)
 
         if training:
+            print("ステップ", self._step,"リセット", len(reset))
+            print("actionRepeat",self._config.action_repeat)
             self._step += len(reset)
             self._logger.step = self._config.action_repeat * self._step
         return policy_output, state
@@ -155,7 +160,9 @@ class Dreamer(nn.Module):
         reward = lambda f, s, a: self._wm.heads["reward"](
             self._wm.dynamics.get_feat(s)
         ).mode()
+        print("強化学習モデルの学習",reward)
         metrics.update(self._task_behavior._train(start, reward)[-1])
+        
         if self._config.expl_behavior != "greedy":
             mets = self._expl_behavior.train(start, context, data)[-1]
             metrics.update({"expl_" + key: value for key, value in mets.items()})
@@ -278,7 +285,9 @@ def main(config):
     if config.offline_evaldir:
         directory = config.offline_evaldir.format(**vars(config))
     else:
+        print("2", directory)
         directory = config.evaldir
+    print("directory", directory)
     eval_eps = tools.load_episodes(directory, limit=1)
     print("config" ,config)
     make = lambda mode, id: make_env(config, mode, id)
@@ -322,7 +331,7 @@ def main(config):
             action = random_actor.sample()
             logprob = random_actor.log_prob(action)
             return {"action": action, "logprob": logprob}, None
-        
+        print("Prefillをおこなう。")
         # ランダムアクターを使用してデータセットを事前に準備
         state = tools.simulate(
             random_agent,
@@ -334,9 +343,10 @@ def main(config):
             steps=prefill,
         )
         logger.step += prefill * config.action_repeat
-        print(f"Logger: ({logger.step} steps).")
+        print(f"Logger: ({logger.step} steps).") # 2500
 
-    print("Prefillをおこなう。")
+    
+    # 2500ステップまでプレフィルを行う。
     '''
     エピソードを分割:
     エピソードを config.batch_length（例えば5ステップ）で切り分ける。
@@ -366,6 +376,8 @@ def main(config):
     # トレーニングと評価のループ(学習終了まで続くループ)
     while agent._step < config.steps + config.eval_every:
         print("Start episode.")
+        print("agent step", agent._step)
+        print("config steps", config.steps) 
         # 現在のトレーニング状態（ステップ数や報酬など）をログに記録
         logger.write()
         if config.eval_episode_num > 0:

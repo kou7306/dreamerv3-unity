@@ -115,6 +115,7 @@ class WorldModel(nn.Module):
         with tools.RequiresGrad(self):
             with torch.cuda.amp.autocast(self._use_amp):
                 embed = self.encoder(data)
+                print("ここが繰り返し実行")
                 post, prior = self.dynamics.observe(
                     embed, data["action"], data["is_first"]
                 )
@@ -190,6 +191,7 @@ class WorldModel(nn.Module):
 
     # エージェントが観測した画像を元に、未来の画像を予測するための処理
     def video_pred(self, data):
+        print("video_pred")
         data = self.preprocess(data)
         embed = self.encoder(data)
 
